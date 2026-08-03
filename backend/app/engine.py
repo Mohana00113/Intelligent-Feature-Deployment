@@ -4,7 +4,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models import FeatureFlag
+from app.models import FeatureFlag, UserGroupMembership
 
 _ENVIRONMENT_MAP: dict[str, int] = {
     "development": 1,
@@ -106,6 +106,22 @@ def evaluate_feature_flag(
         resolved["enabled"] = True
         resolved["reason"] = "user_targeted"
         return resolved
+
+    # 2. Group targeting
+    try:
+        target_groups = resolved_flag.target_groups or []
+    except AttributeError:
+        target_groups = []
+
+    if user_id is not None and target_groups:
+        # Query user's groups from the membership table
+        memberships = db.query(UserGroupMembership).filter(UserGroupMembership.user_id == user_id).all()
+        user_groups = [m.group_name for m in memberships]
+        # If any of the user's groups match target_groups, enable the flag
+        if any(g in target_groups for g in user_groups):
+            resolved["enabled"] = True
+            resolved["reason"] = "group_targeted"
+            return resolved
 
     # TODO: group targeting and percentage rollout would go here (not implemented yet)
 

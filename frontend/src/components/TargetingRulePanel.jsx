@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 
-const TargetingRulePanel = ({ users = [], onChange, onSave }) => {
+const TargetingRulePanel = ({ users = [], groups = [], onChange, onSave }) => {
   const [localUsers, setLocalUsers] = useState(Array.isArray(users) ? users : []);
+  const [localGroups, setLocalGroups] = useState(Array.isArray(groups) ? groups : []);
   const [input, setInput] = useState('');
+  const [groupInput, setGroupInput] = useState('');
 
   const handleAdd = () => {
     const v = input.trim();
@@ -23,6 +25,25 @@ const TargetingRulePanel = ({ users = [], onChange, onSave }) => {
     if (onChange) onChange(next);
   };
 
+  const handleAddGroup = () => {
+    const v = groupInput.trim();
+    if (!v) return;
+    if (localGroups.includes(v)) {
+      setGroupInput('');
+      return;
+    }
+    const next = [...localGroups, v];
+    setLocalGroups(next);
+    setGroupInput('');
+    if (onChange) onChange(localUsers, next);
+  };
+
+  const handleRemoveGroup = (name) => {
+    const next = localGroups.filter((g) => g !== name);
+    setLocalGroups(next);
+    if (onChange) onChange(localUsers, next);
+  };
+
   return (
     <div style={styles.panel}>
       <h4 style={styles.title}>User Targeting</h4>
@@ -40,23 +61,62 @@ const TargetingRulePanel = ({ users = [], onChange, onSave }) => {
         </button>
       </div>
 
-      <ul style={styles.list}>
-        {localUsers.length === 0 ? (
-          <li style={styles.empty}>No users targeted.</li>
-        ) : (
-          localUsers.map((u) => (
-            <li key={u} style={styles.listItem}>
-              <span style={styles.userId}>{u}</span>
-              <button type="button" style={styles.removeButton} onClick={() => handleRemove(u)}>
-                Remove
-              </button>
-            </li>
-          ))
-        )}
-      </ul>
+      <div style={{ display: 'grid', gap: '12px' }}>
+        <div>
+          <strong style={{ display: 'block', marginBottom: 8 }}>Target Groups</strong>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            <input
+              placeholder="beta_users"
+              value={groupInput}
+              onChange={(e) => setGroupInput(e.target.value)}
+              style={styles.input}
+            />
+            <button type="button" style={styles.addButton} onClick={handleAddGroup}>
+              Add Group
+            </button>
+          </div>
+
+          <ul style={styles.list}>
+            {localGroups.length === 0 ? (
+              <li style={styles.empty}>No groups targeted.</li>
+            ) : (
+              localGroups.map((g) => (
+                <li key={g} style={styles.listItem}>
+                  <span style={styles.userId}>✓ {g}</span>
+                  <button type="button" style={styles.removeButton} onClick={() => handleRemoveGroup(g)}>
+                    Remove
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+
+        <div>
+          <strong style={{ display: 'block', marginBottom: 8 }}>Target Users</strong>
+          <ul style={styles.list}>
+            {localUsers.length === 0 ? (
+              <li style={styles.empty}>No users targeted.</li>
+            ) : (
+              localUsers.map((u) => (
+                <li key={u} style={styles.listItem}>
+                  <span style={styles.userId}>{u}</span>
+                  <button type="button" style={styles.removeButton} onClick={() => handleRemove(u)}>
+                    Remove
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+      </div>
 
       <div style={styles.actions}>
-        <button type="button" style={styles.saveButton} onClick={() => onSave && onSave(localUsers)}>
+        <button
+          type="button"
+          style={styles.saveButton}
+          onClick={() => onSave && onSave(localUsers, localGroups)}
+        >
           Save Targeting
         </button>
       </div>

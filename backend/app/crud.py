@@ -31,6 +31,7 @@ def create_flag(db: Session, flag: FlagCreate) -> FeatureFlag:
         default_value=flag.default_value,
         enabled=flag.enabled,
         target_users=flag.target_users,
+        target_groups=flag.target_groups,
         description=flag.description,
         owner_team=flag.owner_team,
         environment_id=flag.environment_id,
@@ -107,6 +108,8 @@ def update_flag(db: Session, key: str, flag: FlagUpdate) -> FeatureFlag:
         db_flag.enabled = flag.enabled
     if flag.target_users is not None:
         db_flag.target_users = flag.target_users
+    if flag.target_groups is not None:
+        db_flag.target_groups = flag.target_groups
     if flag.description is not None:
         db_flag.description = flag.description
     if flag.owner_team is not None:

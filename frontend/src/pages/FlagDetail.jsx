@@ -14,6 +14,7 @@ function FlagDetail() {
   const navigate = useNavigate()
   const [flag, setFlag] = useState(null)
   const [targetUsers, setTargetUsers] = useState([])
+  const [targetGroups, setTargetGroups] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -86,13 +87,18 @@ function FlagDetail() {
               <h3 style={styles.targetingRulesTitle}>Targeting Rules</h3>
               <TargetingRulePanel
                 users={flag.target_users || []}
-                onChange={(users) => setTargetUsers(users)}
-                onSave={async (users) => {
+                groups={flag.target_groups || []}
+                onChange={(users, groups) => {
+                  setTargetUsers(users)
+                  setTargetGroups(groups)
+                }}
+                onSave={async (users, groups) => {
                   try {
-                    await updateFlag(flag.key, { target_users: users })
+                    await updateFlag(flag.key, { target_users: users, target_groups: groups })
                     const updated = await getFlagByKey(key)
                     setFlag(updated)
                     setTargetUsers([])
+                    setTargetGroups([])
                   } catch (err) {
                     setError(err.message || 'Unable to save targeting rules.')
                   }

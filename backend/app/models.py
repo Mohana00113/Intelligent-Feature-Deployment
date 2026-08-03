@@ -48,6 +48,8 @@ class FeatureFlag(Base):
     enabled = Column(Boolean, nullable=False, default=True)
     # List of user identifiers explicitly targeted to receive the flag
     target_users = Column(JSON, nullable=False, default=list)
+    # List of group names explicitly targeted to receive the flag
+    target_groups = Column(JSON, nullable=False, default=list)
     description = Column(Text, nullable=True)
     owner_team = Column(String(100), nullable=False, index=True)
     environment_id = Column(Integer, nullable=False, index=True)
@@ -57,3 +59,20 @@ class FeatureFlag(Base):
             f"FeatureFlag(id={self.id!r}, key={self.key!r}, "
             f"type={self.type!r}, enabled={self.enabled!r})"
         )
+
+
+class UserGroupMembership(Base):
+    """Simple mapping table for user -> group membership used by the evaluation engine.
+
+    Implemented minimally for Day 8 so the engine can resolve group membership
+    without introducing a separate membership service.
+    """
+
+    __tablename__ = "user_group_memberships"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String(100), nullable=False, index=True)
+    group_name = Column(String(100), nullable=False, index=True)
+
+    def __repr__(self) -> str:
+        return f"UserGroupMembership(user_id={self.user_id!r}, group_name={self.group_name!r})"
