@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Route, Routes } from 'react-router-dom'
 
 import Navbar from './components/Navbar'
@@ -12,22 +12,43 @@ const DashboardPage = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  const loadFlags = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError('')
+      const data = await getFlags()
+      setFlags(Array.isArray(data) ? data : [])
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load feature flag summary.'
+      console.error('Dashboard summary fetch failed:', err)
+      setError(message)
+      setFlags([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
+    let isMounted = true
+
     async function loadSummary() {
       try {
-        setLoading(true)
-        setError('')
-        const data = await getFlags()
-        setFlags(data)
-      } catch (err) {
-        setError(err.message || 'Failed to load feature flag summary.')
-      } finally {
-        setLoading(false)
+        if (!isMounted) {
+          return
+        }
+
+        await loadFlags()
+      } catch (loadError) {
+        console.error('Dashboard summary failed to refresh:', loadError)
       }
     }
 
-    loadSummary()
-  }, [])
+    void loadSummary()
+
+    return () => {
+      isMounted = false
+    }
+  }, [loadFlags])
 
   const summaryCards = useMemo(() => {
     const total = flags.length
@@ -58,7 +79,7 @@ const DashboardPage = () => {
         {error ? <p style={styles.errorMessage}>{error}</p> : null}
 
         <div style={styles.tableSection}>
-          <FeatureFlags />
+          <FeatureFlags flags={flags} loading={loading} error={error} onRefresh={loadFlags} />
         </div>
       </div>
     </main>

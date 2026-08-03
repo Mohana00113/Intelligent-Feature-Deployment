@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import FeatureFlagForm from '../components/FeatureFlagForm';
@@ -14,9 +14,12 @@ const createInitialForm = () => ({
   environment_id: 1,
 });
 
-function FeatureFlags() {
-  const [flags, setFlags] = useState([]);
-  const [loading, setLoading] = useState(true);
+function FeatureFlags({ flags: controlledFlags, loading: controlledLoading, error: controlledError, onRefresh }) {
+  const navigate = useNavigate();
+  const isControlled = typeof controlledFlags !== 'undefined';
+
+  const [internalFlags, setInternalFlags] = useState([]);
+  const [loading, setLoading] = useState(!isControlled);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -24,8 +27,11 @@ function FeatureFlags() {
   const [form, setForm] = useState(createInitialForm);
   const [formErrors, setFormErrors] = useState({});
   const [formMode, setFormMode] = useState('create');
-  const navigate = useNavigate();
   const [editingFlag, setEditingFlag] = useState(null);
+
+  const flags = isControlled ? (Array.isArray(controlledFlags) ? controlledFlags : []) : internalFlags;
+  const currentLoading = isControlled ? Boolean(controlledLoading) : loading;
+  const currentError = isControlled ? controlledError : error;
 
   const environmentOptions = useMemo(() => [
     { value: 1, label: 'Development' },
@@ -33,22 +39,53 @@ function FeatureFlags() {
     { value: 3, label: 'Production' },
   ], []);
 
-  async function loadFlags() {
+  const loadFlags = useCallback(async () => {
+    if (isControlled) {
+      if (onRefresh) {
+        await onRefresh();
+      }
+      return;
+    }
+
     try {
       setLoading(true);
       setError('');
       const data = await getFlags();
-      setFlags(data);
+      setInternalFlags(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError(err.message || 'Failed to load feature flags.');
+      const message = err instanceof Error ? err.message : 'Failed to load feature flags.';
+      console.error('Failed to fetch feature flags:', err);
+      setError(message);
+      setInternalFlags([]);
     } finally {
       setLoading(false);
     }
-  }
+  }, [isControlled, onRefresh]);
 
   useEffect(() => {
-    loadFlags();
-  }, []);
+    if (isControlled) {
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    async function fetchFlags() {
+      try {
+        if (!isMounted) {
+          return;
+        }
+        await loadFlags();
+      } catch (err) {
+        console.error('Feature flag list refresh failed:', err);
+      }
+    }
+
+    void fetchFlags();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isControlled, loadFlags]);
 
   const handleOpenModal = (flag = null) => {
     if (flag) {
@@ -71,7 +108,9 @@ function FeatureFlags() {
 
     setFormErrors({});
     setSuccessMessage('');
-    setError('');
+    if (!isControlled) {
+      setError('');
+    }
     setIsModalOpen(true);
   };
 
@@ -90,7 +129,9 @@ function FeatureFlags() {
       setSuccessMessage(`Flag '${flagKey}' deleted successfully.`);
       await loadFlags();
     } catch (err) {
-      setError(err.message || 'Unable to delete feature flag.');
+      const message = err instanceof Error ? err.message : 'Unable to delete feature flag.';
+      console.error('Delete feature flag failed:', err);
+      setError(message);
     }
   };
 
@@ -164,7 +205,9 @@ function FeatureFlags() {
       await loadFlags();
       handleCloseModal();
     } catch (err) {
-      setError(err.message || 'Unable to create feature flag.');
+      const message = err instanceof Error ? err.message : 'Unable to create feature flag.';
+      console.error('Feature flag submit failed:', err);
+      setError(message);
     } finally {
       setSubmitting(false);
     }
@@ -184,10 +227,13 @@ function FeatureFlags() {
         </div>
 
         {successMessage ? <p style={styles.success}>{successMessage}</p> : null}
-        {error ? <p style={styles.error}>{error}</p> : null}
+        {!isControlled && currentError ? <p style={styles.error}>{currentError}</p> : null}
 
-        {loading ? (
-          <p style={styles.message}>Loading...</p>
+        {currentLoading ? (
+          <div style={styles.loadingState}>
+            <span style={styles.spinner} aria-label="Loading" />
+            <span>Loading feature flags...</span>
+          </div>
         ) : flags.length === 0 ? (
           <p style={styles.message}>No feature flags found. Create one to get started.</p>
         ) : (
@@ -306,6 +352,23 @@ const styles = {
   tableWrapper: {
     overflowX: 'auto',
   },
+  loadingState: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    color: '#4b5563',
+    fontSize: '14px',
+    padding: '12px 0',
+  },
+  spinner: {
+    width: '16px',
+    height: '16px',
+    border: '2px solid #dbeafe',
+    borderTopColor: '#2563eb',
+    borderRadius: '50%',
+    display: 'inline-block',
+    animation: 'spin 0.8s linear infinite',
+  },
   message: {
     margin: 0,
     color: '#4b5563',
@@ -323,103 +386,69 @@ const styles = {
     fontSize: '14px',
     fontWeight: 600,
   },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-  },
-  th: {
-    textAlign: 'left',
-    padding: '12px',
-    background: '#eef2ff',
-    color: '#374151',
-    borderBottom: '1px solid #d1d5db',
-    fontSize: '14px',
-  },
-  td: {
-    padding: '12px',
-    borderBottom: '1px solid #e5e7eb',
-    color: '#111827',
-    fontSize: '14px',
-  },
   enabled: {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: '6px',
-    color: '#15803d',
+    borderRadius: '999px',
+    background: '#dcfce7',
+    color: '#166534',
+    padding: '6px 10px',
     fontWeight: 600,
   },
   disabled: {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: '6px',
-    color: '#b91c1c',
+    borderRadius: '999px',
+    background: '#fee2e2',
+    color: '#991b1b',
+    padding: '6px 10px',
     fontWeight: 600,
   },
-  modalOverlay: {
-    position: 'fixed',
-    inset: 0,
-    background: 'rgba(17, 24, 39, 0.6)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '20px',
+  th: {
+    textAlign: 'left',
+    padding: '12px 10px',
+    borderBottom: '1px solid #e5e7eb',
+    color: '#374151',
+    fontSize: '12px',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
   },
-  modalCard: {
-    width: '100%',
-    maxWidth: '560px',
-    background: '#ffffff',
-    borderRadius: '12px',
-    padding: '24px',
-    boxShadow: '0 20px 45px rgba(0, 0, 0, 0.24)',
-  },
-  modalHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '16px',
-  },
-  modalTitle: {
-    margin: 0,
-    fontSize: '20px',
+  td: {
+    padding: '12px 10px',
+    borderBottom: '1px solid #f1f5f9',
     color: '#111827',
+    fontSize: '14px',
   },
-  closeButton: {
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse',
+  },
+  linkButton: {
     border: 'none',
     background: 'transparent',
-    fontSize: '24px',
-    color: '#6b7280',
+    color: '#2563eb',
     cursor: 'pointer',
-  },
-  form: {
-    display: 'grid',
-    gap: '12px',
-  },
-  field: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '6px',
-  },
-  label: {
-    fontSize: '14px',
     fontWeight: 600,
-    color: '#374151',
+    marginRight: '8px',
   },
-  input: {
-    border: '1px solid #d1d5db',
-    borderRadius: '8px',
-    padding: '10px 12px',
-    fontSize: '14px',
-    color: '#111827',
+  editButton: {
+    border: 'none',
+    background: '#dbeafe',
+    color: '#1d4ed8',
+    borderRadius: '6px',
+    padding: '6px 10px',
+    cursor: 'pointer',
+    fontWeight: 600,
+    marginRight: '8px',
   },
-  fieldError: {
+  deleteButton: {
+    border: 'none',
+    background: '#fee2e2',
     color: '#b91c1c',
-    fontSize: '12px',
-  },
-  modalActions: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    gap: '10px',
-    marginTop: '8px',
+    borderRadius: '6px',
+    padding: '6px 10px',
+    cursor: 'pointer',
+    fontWeight: 600,
   },
 };
 

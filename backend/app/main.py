@@ -2,7 +2,7 @@ from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.database import get_db, init_db
 from app.engine import evaluate_feature_flag
 from app.routes.flags import router as flags_router
 from app.schemas import FlagEvaluationResponse
@@ -16,6 +16,8 @@ app.add_middleware(
         "http://127.0.0.1:5173",
         "http://localhost:5174",
         "http://127.0.0.1:5174",
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -23,6 +25,13 @@ app.add_middleware(
 )
 
 app.include_router(flags_router, prefix="/flags", tags=["Feature Flags"])
+
+
+@app.on_event("startup")
+def startup_event() -> None:
+    """Ensure the database schema is created before processing requests."""
+
+    init_db()
 
 
 @app.get("/")
