@@ -25,6 +25,7 @@ class FlagCreate(BaseModel):
     description: Optional[str] = Field(default=None, description="Optional business context or rollout notes.")
     owner_team: str = Field(..., min_length=1, max_length=100, description="Team responsible for the flag.")
     environment_id: int = Field(..., description="Environment identifier this flag belongs to.")
+    target_users: list[str] = Field(default_factory=list, description="List of user IDs explicitly targeted for this flag.")
 
     @field_validator("environment_id")
     def validate_environment_id(cls, value: int) -> int:
@@ -68,6 +69,7 @@ class FlagUpdate(BaseModel):
     description: Optional[str] = Field(default=None, description="Updated business context or rollout notes.")
     owner_team: Optional[str] = Field(default=None, min_length=1, max_length=100, description="Updated team responsible for the flag.")
     environment_id: Optional[int] = Field(default=None, description="Updated environment identifier for the flag.")
+    target_users: Optional[list[str]] = Field(default=None, description="Updated list of user IDs targeted for this flag.")
 
     @field_validator("environment_id")
     def validate_environment_id(cls, value: Optional[int]) -> Optional[int]:
@@ -91,6 +93,7 @@ class FlagUpdate(BaseModel):
                 self.description,
                 self.owner_team,
                 self.environment_id,
+                self.target_users,
             )
         ):
             raise ValueError("At least one field must be provided for update.")
@@ -141,6 +144,7 @@ class FlagResponse(BaseModel):
     description: Optional[str] = Field(default=None, description="Optional business context or rollout notes.")
     owner_team: str = Field(..., min_length=1, max_length=100, description="Team responsible for the flag.")
     environment_id: int = Field(..., gt=0, description="Environment identifier this flag belongs to.")
+    target_users: list[str] = Field(default_factory=list, description="List of user IDs explicitly targeted for this flag.")
 
 
 class FlagEvaluationResponse(BaseModel):
@@ -152,3 +156,4 @@ class FlagEvaluationResponse(BaseModel):
     environment: str = Field(..., min_length=0, description="Requested environment name.")
     enabled: bool = Field(..., description="Resolved enabled state for the requested environment.")
     default_value: Any = Field(..., description="Resolved fallback value for the feature flag.")
+    reason: Optional[str] = Field(default=None, description="Reason the evaluation resolved to a particular enabled state.")

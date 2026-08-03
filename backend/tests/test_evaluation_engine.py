@@ -117,3 +117,27 @@ def test_missing_or_empty_user_context_is_handled_safely(db_session):
     assert result_without_context["default_value"] is True
     assert result_with_empty_context["enabled"] is True
     assert result_with_empty_context["default_value"] is True
+
+
+def test_user_in_target_users_is_enabled_immediately(db_session):
+    default_flag = FeatureFlag(
+        key="whitelist_feature",
+        type="boolean",
+        default_value=False,
+        enabled=True,
+        description="user whitelist",
+        owner_team="Platform",
+        environment_id=1,
+        target_users=["user-42"],
+    )
+
+    db_session.add(default_flag)
+    db_session.commit()
+
+    result = evaluate_feature_flag(
+        db_session, "whitelist_feature", "development", user_context={"user_id": "user-42"}, include_reason=True
+    )
+
+    assert result["enabled"] is True
+    assert result["default_value"] is False
+    assert result["reason"] == "user_targeted"

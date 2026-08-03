@@ -12,6 +12,7 @@ const createInitialForm = () => ({
   description: '',
   owner_team: '',
   environment_id: 1,
+  target_users: [],
 });
 
 function FeatureFlags({ flags: controlledFlags, loading: controlledLoading, error: controlledError, onRefresh }) {
@@ -97,6 +98,7 @@ function FeatureFlags({ flags: controlledFlags, loading: controlledLoading, erro
         description: flag.description || '',
         owner_team: flag.owner_team || '',
         environment_id: flag.environment_id || 1,
+        target_users: flag.target_users || [],
       });
       setFormMode('edit');
       setEditingFlag(flag);
@@ -192,6 +194,7 @@ function FeatureFlags({ flags: controlledFlags, loading: controlledLoading, erro
         description: form.description.trim(),
         owner_team: form.owner_team.trim(),
         environment_id: form.environment_id,
+        target_users: form.target_users || [],
       };
 
       if (formMode === 'edit' && editingFlag) {

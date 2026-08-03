@@ -39,6 +39,7 @@ def evaluate_feature_flag(
     key: str,
     environment: str | None,
     user_context: dict[str, Any] | None = None,
+    include_reason: bool = False,
 ) -> dict[str, Any]:
     """Resolve a feature flag for the supplied environment.
 
@@ -69,9 +70,54 @@ def evaluate_feature_flag(
         )
         resolved_flag = baseline_flag or matching_flags[0]
 
-    return {
+    # Determine base resolution
+    resolved = {
         "key": resolved_flag.key,
         "environment": _normalize_environment(environment),
         "enabled": bool(resolved_flag.enabled),
         "default_value": resolved_flag.default_value,
+        "reason": None,
+    }
+
+    # If the feature is disabled globally for this record, note reason and set enabled False
+    if not resolved_flag.enabled:
+        resolved["reason"] = "feature_disabled"
+        resolved["enabled"] = False
+        if include_reason:
+            return resolved
+        return {
+            "key": resolved["key"],
+            "environment": resolved["environment"],
+            "enabled": resolved["enabled"],
+            "default_value": resolved["default_value"],
+        }
+
+    # User context may be empty
+    ctx = user_context or {}
+
+    # 1. User targeting (highest priority)
+    try:
+        target_users = resolved_flag.target_users or []
+    except AttributeError:
+        target_users = []
+
+    user_id = ctx.get("user_id")
+    if user_id is not None and user_id in target_users:
+        resolved["enabled"] = True
+        resolved["reason"] = "user_targeted"
+        return resolved
+
+    # TODO: group targeting and percentage rollout would go here (not implemented yet)
+
+    # Fall back to enabled/default value
+    resolved["reason"] = "default"
+    if include_reason:
+        return resolved
+
+    # Backwards-compatible shape for callers that expect the original result
+    return {
+        "key": resolved["key"],
+        "environment": resolved["environment"],
+        "enabled": resolved["enabled"],
+        "default_value": resolved["default_value"],
     }

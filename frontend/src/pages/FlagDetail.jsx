@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { deleteFlag, getFlagByKey } from '../services/api'
+import { deleteFlag, getFlagByKey, updateFlag } from '../services/api'
+import TargetingRulePanel from '../components/TargetingRulePanel'
 
 const environmentLabels = {
   1: 'Development',
@@ -12,6 +13,7 @@ function FlagDetail() {
   const { key } = useParams()
   const navigate = useNavigate()
   const [flag, setFlag] = useState(null)
+  const [targetUsers, setTargetUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -82,7 +84,20 @@ function FlagDetail() {
 
             <div style={styles.targetingRulesSection}>
               <h3 style={styles.targetingRulesTitle}>Targeting Rules</h3>
-              <p style={styles.targetingRulesText}>No targeting rules configured yet.</p>
+              <TargetingRulePanel
+                users={flag.target_users || []}
+                onChange={(users) => setTargetUsers(users)}
+                onSave={async (users) => {
+                  try {
+                    await updateFlag(flag.key, { target_users: users })
+                    const updated = await getFlagByKey(key)
+                    setFlag(updated)
+                    setTargetUsers([])
+                  } catch (err) {
+                    setError(err.message || 'Unable to save targeting rules.')
+                  }
+                }}
+              />
             </div>
           </>
         ) : (

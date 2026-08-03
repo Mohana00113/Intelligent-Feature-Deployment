@@ -46,6 +46,8 @@ class FeatureFlag(Base):
     type = Column(String(20), nullable=False)
     default_value = Column(JSON, nullable=False)
     enabled = Column(Boolean, nullable=False, default=True)
+    # List of user identifiers explicitly targeted to receive the flag
+    target_users = Column(JSON, nullable=False, default=list)
     description = Column(Text, nullable=True)
     owner_team = Column(String(100), nullable=False, index=True)
     environment_id = Column(Integer, nullable=False, index=True)

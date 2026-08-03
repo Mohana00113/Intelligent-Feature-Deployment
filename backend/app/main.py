@@ -34,6 +34,15 @@ def startup_event() -> None:
     init_db()
 
 
+# Create the DB at import time as well to support test clients that import the
+# app module without triggering lifespan handlers in some test runners.
+try:
+    init_db()
+except Exception:
+    # Avoid raising during import if the DB can't be created in the current environment.
+    pass
+
+
 @app.get("/")
 def home() -> dict[str, str]:
     return {"message": "Intelligent Feature Deployment API is running"}
@@ -44,11 +53,17 @@ def home() -> dict[str, str]:
     response_model=FlagEvaluationResponse,
     summary="Evaluate a feature flag for an environment",
 )
-def evaluate_flag(key: str, environment: str, db: Session = Depends(get_db)) -> FlagEvaluationResponse:
+def evaluate_flag(
+    key: str,
+    environment: str,
+    user_id: str | None = None,
+    db: Session = Depends(get_db),
+) -> FlagEvaluationResponse:
     """Resolve a feature flag's enabled state for an environment."""
 
     try:
-        return evaluate_feature_flag(db=db, key=key, environment=environment)
+        user_context = {"user_id": user_id} if user_id is not None else None
+        return evaluate_feature_flag(db=db, key=key, environment=environment, user_context=user_context, include_reason=True)
     except KeyError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
