@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { deleteFlag, getFlagByKey, updateFlag } from '../services/api'
+import EnvironmentOverridePanel from '../components/EnvironmentOverridePanel'
 import EvaluationTestPanel from '../components/EvaluationTestPanel'
 import TargetingRulePanel from '../components/TargetingRulePanel'
 
@@ -160,6 +161,8 @@ function FlagDetail() {
                 saving={savingTargeting}
               />
             </div>
+
+            <EnvironmentOverridePanel flag={flag} />
 
             <EvaluationTestPanel
               flagKey={flag.key}
