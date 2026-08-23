@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
-const TargetingRulePanel = ({ users = [], groups = [], onChange, onSave }) => {
+const TargetingRulePanel = ({ users = [], groups = [], onChange, onSave, saving = false }) => {
   const [localUsers, setLocalUsers] = useState(Array.isArray(users) ? users : []);
   const [localGroups, setLocalGroups] = useState(Array.isArray(groups) ? groups : []);
   const [input, setInput] = useState('');
@@ -116,8 +116,9 @@ const TargetingRulePanel = ({ users = [], groups = [], onChange, onSave }) => {
           type="button"
           style={styles.saveButton}
           onClick={() => onSave && onSave(localUsers, localGroups)}
+          disabled={saving}
         >
-          Save Targeting
+          {saving ? 'Saving...' : 'Save Targeting'}
         </button>
       </div>
     </div>

@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { deleteFlag, getFlagByKey, updateFlag } from '../services/api'
+import EvaluationTestPanel from '../components/EvaluationTestPanel'
 import TargetingRulePanel from '../components/TargetingRulePanel'
 
 const environmentLabels = {
@@ -13,8 +14,11 @@ function FlagDetail() {
   const { key } = useParams()
   const navigate = useNavigate()
   const [flag, setFlag] = useState(null)
-  const [targetUsers, setTargetUsers] = useState([])
-  const [targetGroups, setTargetGroups] = useState([])
+  const [, setTargetUsers] = useState([])
+  const [, setTargetGroups] = useState([])
+  const [rolloutPercentage, setRolloutPercentage] = useState(0)
+  const [savingRollout, setSavingRollout] = useState(false)
+  const [savingTargeting, setSavingTargeting] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -43,6 +47,7 @@ function FlagDetail() {
         setError('')
         const data = await getFlagByKey(key)
         setFlag(data)
+        setRolloutPercentage(Number(data?.rollout_percentage ?? 0))
       } catch (err) {
         setError(err.message || 'Unable to load feature flag.')
       } finally {
@@ -52,6 +57,27 @@ function FlagDetail() {
 
     loadFlag()
   }, [key])
+
+  const handleRolloutSave = async (nextPercentage) => {
+    if (!flag || !key) {
+      return
+    }
+
+    const value = Number.isFinite(nextPercentage) ? Number(nextPercentage) : 0
+    try {
+      setSavingRollout(true)
+      setError('')
+      await updateFlag(flag.key, { rollout_percentage: value })
+      const updated = await getFlagByKey(key)
+      setFlag(updated)
+      setRolloutPercentage(Number(updated?.rollout_percentage ?? value))
+    } catch (err) {
+      setRolloutPercentage(Number(flag.rollout_percentage ?? 0))
+      setError(err.message || 'Unable to save rollout percentage.')
+    } finally {
+      setSavingRollout(false)
+    }
+  }
 
   return (
     <div style={styles.page}>
@@ -67,7 +93,7 @@ function FlagDetail() {
         <h2 style={styles.title}>Feature Flag Details</h2>
 
         {loading ? (
-          <p style={styles.message}>Loading flag details...</p>
+          <p style={styles.loadingMessage}><span style={styles.spinner} aria-label="Loading" /> Loading flag details...</p>
         ) : error ? (
           <p style={styles.error}>{error}</p>
         ) : flag ? (
@@ -78,9 +104,34 @@ function FlagDetail() {
               <DetailRow label="Default Value" value={String(flag.default_value)} />
               <DetailRow label="Description" value={flag.description || 'No description provided.'} />
               <DetailRow label="Current Status" value={flag.enabled ? 'Enabled' : 'Disabled'} />
+              <DetailRow label="Rollout Percentage" value={`${Number(flag.rollout_percentage ?? 0)}%`} />
               <DetailRow label="Owner Team" value={flag.owner_team} />
               <DetailRow label="Environment" value={environmentLabels[flag.environment_id] || String(flag.environment_id)} />
               <DetailRow label="Record ID" value={String(flag.id)} />
+            </div>
+
+            <div style={styles.rolloutSection}>
+              <h3 style={styles.targetingRulesTitle}>Percentage Rollout</h3>
+              <label htmlFor="rollout-slider" style={styles.sliderLabel}>Rollout percentage</label>
+              <div style={styles.sliderRow}>
+                <input
+                  id="rollout-slider"
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={rolloutPercentage}
+                  onChange={(event) => setRolloutPercentage(Number(event.target.value))}
+                  onMouseUp={() => handleRolloutSave(rolloutPercentage)}
+                  onTouchEnd={() => handleRolloutSave(rolloutPercentage)}
+                  style={styles.sliderInput}
+                  aria-label="Percentage rollout"
+                />
+                <span style={styles.sliderValue}>{rolloutPercentage}%</span>
+              </div>
+              <div style={styles.sliderMeta}>
+                <span>{savingRollout ? <><span style={styles.inlineSpinner} aria-label="Saving" /> Saving...</> : `Enabled for ${rolloutPercentage}% of users.`}</span>
+              </div>
             </div>
 
             <div style={styles.targetingRulesSection}>
@@ -94,6 +145,7 @@ function FlagDetail() {
                 }}
                 onSave={async (users, groups) => {
                   try {
+                    setSavingTargeting(true)
                     await updateFlag(flag.key, { target_users: users, target_groups: groups })
                     const updated = await getFlagByKey(key)
                     setFlag(updated)
@@ -101,10 +153,18 @@ function FlagDetail() {
                     setTargetGroups([])
                   } catch (err) {
                     setError(err.message || 'Unable to save targeting rules.')
+                  } finally {
+                    setSavingTargeting(false)
                   }
                 }}
+                saving={savingTargeting}
               />
             </div>
+
+            <EvaluationTestPanel
+              flagKey={flag.key}
+              initialEnvironment={environmentLabels[flag.environment_id]?.toLowerCase() || 'development'}
+            />
           </>
         ) : (
           <p style={styles.message}>No flag data available.</p>
@@ -168,6 +228,32 @@ const styles = {
   message: {
     color: '#6b7280',
   },
+  loadingMessage: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    color: '#6b7280',
+  },
+  spinner: {
+    width: '16px',
+    height: '16px',
+    border: '2px solid #dbeafe',
+    borderTopColor: '#2563eb',
+    borderRadius: '50%',
+    display: 'inline-block',
+    animation: 'spin 0.8s linear infinite',
+  },
+  inlineSpinner: {
+    width: '12px',
+    height: '12px',
+    marginRight: '6px',
+    border: '2px solid #dbeafe',
+    borderTopColor: '#2563eb',
+    borderRadius: '50%',
+    display: 'inline-block',
+    animation: 'spin 0.8s linear infinite',
+    verticalAlign: 'middle',
+  },
   error: {
     color: '#b91c1c',
   },
@@ -192,6 +278,41 @@ const styles = {
   detailValue: {
     color: '#111827',
     fontSize: '16px',
+  },
+  rolloutSection: {
+    marginTop: '24px',
+    background: '#f8fafc',
+    border: '1px solid #e2e8f0',
+    borderRadius: '12px',
+    padding: '20px',
+    display: 'grid',
+    gap: '12px',
+  },
+  sliderLabel: {
+    fontSize: '12px',
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+    color: '#374151',
+    fontWeight: 700,
+  },
+  sliderRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+  },
+  sliderInput: {
+    flex: 1,
+    accentColor: '#2563eb',
+  },
+  sliderValue: {
+    minWidth: '52px',
+    textAlign: 'right',
+    fontWeight: 700,
+    color: '#111827',
+  },
+  sliderMeta: {
+    color: '#475569',
+    fontSize: '14px',
   },
   targetingRulesSection: {
     marginTop: '24px',

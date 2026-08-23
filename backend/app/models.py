@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from sqlalchemy import Boolean, Column, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
@@ -46,6 +47,7 @@ class FeatureFlag(Base):
     type = Column(String(20), nullable=False)
     default_value = Column(JSON, nullable=False)
     enabled = Column(Boolean, nullable=False, default=True)
+    rollout_percentage = Column(Integer, nullable=False, default=0)
     # List of user identifiers explicitly targeted to receive the flag
     target_users = Column(JSON, nullable=False, default=list)
     # List of group names explicitly targeted to receive the flag
@@ -58,6 +60,50 @@ class FeatureFlag(Base):
         return (
             f"FeatureFlag(id={self.id!r}, key={self.key!r}, "
             f"type={self.type!r}, enabled={self.enabled!r})"
+        )
+
+
+class Environment(Base):
+    """Persistent environment catalog used by the application and feature-flag overrides."""
+
+    __tablename__ = "environments"
+    __table_args__ = (UniqueConstraint("key", name="uq_environments_key"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False, index=True)
+    key = Column(String(100), nullable=False, unique=True, index=True)
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"Environment(id={self.id!r}, key={self.key!r}, name={self.name!r})"
+
+
+class FlagEnvironmentOverride(Base):
+    """Environment-specific override values for a feature flag."""
+
+    __tablename__ = "flag_environment_overrides"
+    __table_args__ = (
+        UniqueConstraint("flag_id", "environment_id", name="uq_flag_environment_override"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    flag_id = Column(Integer, ForeignKey("feature_flags.id"), nullable=False, index=True)
+    environment_id = Column(Integer, ForeignKey("environments.id"), nullable=False, index=True)
+    enabled = Column(Boolean, nullable=False, default=True)
+    default_value = Column(JSON, nullable=False, default=False)
+    rollout_percentage = Column(Integer, nullable=False, default=0)
+    target_users = Column(JSON, nullable=False, default=list)
+    target_groups = Column(JSON, nullable=False, default=list)
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    def __repr__(self) -> str:
+        return (
+            f"FlagEnvironmentOverride(flag_id={self.flag_id!r}, environment_id={self.environment_id!r}, "
+            f"enabled={self.enabled!r})"
         )
 
 

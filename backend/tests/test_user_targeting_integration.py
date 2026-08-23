@@ -28,6 +28,7 @@ def test_evaluate_endpoint_user_targeting():
             description="integration test whitelist",
             owner_team="Platform",
             environment_id=1,
+            rollout_percentage=100,
             target_users=["user-in-1"],
         )
         session.add(f)

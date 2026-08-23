@@ -1,5 +1,3 @@
-import React from 'react';
-
 const FeatureFlagForm = ({
   isOpen,
   form,
@@ -95,6 +93,26 @@ const FeatureFlagForm = ({
             </select>
           </label>
 
+          <div style={styles.rolloutSection}>
+            <label htmlFor="rollout_percentage" style={styles.label}>Percentage Rollout</label>
+            <div style={styles.rolloutRow}>
+              <input
+                id="rollout_percentage"
+                name="rollout_percentage"
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={Number(form.rollout_percentage ?? 0)}
+                onChange={onChange}
+                style={styles.rangeInput}
+                aria-label="Percentage Rollout"
+              />
+              <span style={styles.rolloutValue}>{Number(form.rollout_percentage ?? 0)}%</span>
+            </div>
+            <p style={styles.rolloutText}>Enabled for {Number(form.rollout_percentage ?? 0)}% of users.</p>
+          </div>
+
           <label style={{ ...styles.field, flexDirection: 'row', alignItems: 'center', gap: '10px' }}>
             <input name="enabled" type="checkbox" checked={form.enabled} onChange={onChange} />
             <span style={styles.label}>Enabled Toggle</span>
@@ -174,6 +192,31 @@ const styles = {
   fieldError: {
     color: '#b91c1c',
     fontSize: '12px',
+  },
+  rolloutSection: {
+    display: 'grid',
+    gap: '8px',
+    padding: '10px 0',
+  },
+  rolloutRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  rangeInput: {
+    flex: 1,
+    accentColor: '#2563eb',
+  },
+  rolloutValue: {
+    minWidth: '56px',
+    textAlign: 'right',
+    fontWeight: 700,
+    color: '#111827',
+  },
+  rolloutText: {
+    margin: 0,
+    color: '#475569',
+    fontSize: '13px',
   },
   modalActions: {
     display: 'flex',

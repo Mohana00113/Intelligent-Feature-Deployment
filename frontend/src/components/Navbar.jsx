@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useEnvironment } from '../context/EnvironmentContext'
 
 const Navbar = () => {
@@ -7,6 +8,7 @@ const Navbar = () => {
     <nav style={styles.navbar}>
       <div style={styles.brandWrap}>
         <strong style={styles.brand}>Intelligent Feature Deployment</strong>
+        <Link to="/environments" style={styles.environmentsLink}>Environments</Link>
       </div>
 
       <div style={styles.environmentWrap}>
@@ -46,6 +48,13 @@ const styles = {
     fontWeight: 700,
     color: '#0f172a',
     letterSpacing: '-0.03em',
+  },
+  environmentsLink: {
+    marginLeft: '18px',
+    color: '#2563eb',
+    fontSize: '0.9rem',
+    fontWeight: 700,
+    textDecoration: 'none',
   },
   environmentWrap: {
     display: 'flex',

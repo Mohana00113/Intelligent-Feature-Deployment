@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import FeatureFlagForm from '../components/FeatureFlagForm';
@@ -9,6 +9,7 @@ const createInitialForm = () => ({
   type: 'boolean',
   default_value: true,
   enabled: true,
+  rollout_percentage: 0,
   description: '',
   owner_team: '',
   environment_id: 1,
@@ -95,6 +96,7 @@ function FeatureFlags({ flags: controlledFlags, loading: controlledLoading, erro
         type: flag.type || 'boolean',
         default_value: Boolean(flag.default_value),
         enabled: flag.enabled ?? true,
+        rollout_percentage: Number(flag.rollout_percentage ?? 0),
         description: flag.description || '',
         owner_team: flag.owner_team || '',
         environment_id: flag.environment_id || 1,
@@ -151,7 +153,7 @@ function FeatureFlags({ flags: controlledFlags, loading: controlledLoading, erro
 
     setForm((current) => ({
       ...current,
-      [name]: name === 'environment_id' ? Number(nextValue) : nextValue,
+      [name]: name === 'environment_id' || name === 'rollout_percentage' ? Number(nextValue) : nextValue,
     }));
   };
 
@@ -191,6 +193,7 @@ function FeatureFlags({ flags: controlledFlags, loading: controlledLoading, erro
         type: 'boolean',
         default_value: form.default_value,
         enabled: form.enabled,
+        rollout_percentage: Number(form.rollout_percentage ?? 0),
         description: form.description.trim(),
         owner_team: form.owner_team.trim(),
         environment_id: form.environment_id,
@@ -224,7 +227,7 @@ function FeatureFlags({ flags: controlledFlags, loading: controlledLoading, erro
             <h2 style={styles.title}>Feature Flag Management</h2>
             <p style={styles.subtitle}>Manage rollout status and ownership for your feature flags.</p>
           </div>
-          <button type="button" style={styles.primaryButton} onClick={handleOpenModal}>
+          <button type="button" style={styles.primaryButton} onClick={() => handleOpenModal()}>
             Create Flag
           </button>
         </div>

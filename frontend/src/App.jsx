@@ -5,6 +5,7 @@ import Navbar from './components/Navbar'
 import { EnvironmentProvider } from './context/EnvironmentContext'
 import FeatureFlags from './pages/FeatureFlags'
 import FlagDetail from './pages/FlagDetail'
+import Environments from './pages/Environments'
 import { getFlags } from './services/api'
 
 const DashboardPage = () => {
@@ -94,6 +95,7 @@ const AppContent = () => {
         <Route path="/" element={<DashboardPage />} />
         <Route path="/flags" element={<FeatureFlags />} />
         <Route path="/flags/:key" element={<FlagDetail />} />
+        <Route path="/environments" element={<Environments />} />
       </Routes>
     </div>
   )

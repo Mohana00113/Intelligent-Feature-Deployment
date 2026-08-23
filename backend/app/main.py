@@ -3,9 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from app.database import get_db, init_db
-from app.engine import evaluate_feature_flag
+from app.cache import evaluation_cache
+from app.engine import evaluate_feature_flag, evaluate_feature_flag_request
+from app.routes.environments import router as environments_router
+from app.routes.flag_environment_overrides import router as flag_environment_overrides_router
 from app.routes.flags import router as flags_router
-from app.schemas import FlagEvaluationResponse
+from app.schemas import FlagEvaluationRequest, FlagEvaluationResponse, RuntimeFlagEvaluationResponse
 
 app = FastAPI(title="Intelligent Feature Deployment API")
 
@@ -25,6 +28,8 @@ app.add_middleware(
 )
 
 app.include_router(flags_router, prefix="/flags", tags=["Feature Flags"])
+app.include_router(environments_router, prefix="/environments", tags=["Environments"])
+app.include_router(flag_environment_overrides_router, prefix="/flag-environment-overrides", tags=["Flag Environment Overrides"])
 
 
 @app.on_event("startup")
@@ -74,3 +79,43 @@ def evaluate_flag(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
+
+
+@app.post(
+    "/evaluate",
+    response_model=RuntimeFlagEvaluationResponse,
+    summary="Evaluate a feature flag for a runtime user",
+)
+def evaluate_runtime_flag(
+    request: FlagEvaluationRequest,
+    db: Session = Depends(get_db),
+) -> RuntimeFlagEvaluationResponse:
+    """Resolve a feature flag using targeting, rollout, and fallback rules."""
+
+    try:
+        cached_result = evaluation_cache.get(request.flag_key, request.environment, request.user_id, request.group)
+        if cached_result is not None:
+            return {**cached_result, "cached": True}
+
+        result = evaluate_feature_flag_request(
+            db=db,
+            flag_key=request.flag_key,
+            environment=request.environment,
+            user_id=request.user_id,
+            group=request.group,
+        )
+        evaluation_cache.set(
+            request.flag_key,
+            request.environment,
+            request.user_id,
+            request.group,
+            result,
+        )
+        return {**result, "cached": False}
+    except KeyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Feature flag '{request.flag_key}' was not found.",
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

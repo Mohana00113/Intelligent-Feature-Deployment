@@ -3,11 +3,54 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.crud import create_flag, delete_flag, get_flag_by_key, get_flags, update_flag
+from app.crud import (
+    create_flag,
+    delete_flag,
+    get_flag_by_key,
+    get_flag_environment_overrides,
+    get_flags,
+    get_or_create_flag_environment_override,
+    update_flag,
+)
 from app.database import get_db
-from app.schemas import FlagCreate, FlagResponse, FlagUpdate
+from app.schemas import (
+    FlagCreate,
+    FlagEnvironmentOverrideResponse,
+    FlagEnvironmentOverrideUpdate,
+    FlagResponse,
+    FlagUpdate,
+)
 
 router = APIRouter(tags=["Feature Flags"])
+
+
+@router.get(
+    "/{key}/environments",
+    response_model=list[FlagEnvironmentOverrideResponse],
+    summary="List environment overrides for a feature flag",
+)
+def list_feature_flag_environment_overrides(key: str, db: Session = Depends(get_db)):
+    return get_flag_environment_overrides(db=db, flag_key=key)
+
+
+@router.put(
+    "/{key}/environments/{environment_id}",
+    response_model=FlagEnvironmentOverrideResponse,
+    summary="Create or update a feature flag environment override",
+)
+def update_feature_flag_environment_override(
+    key: str,
+    environment_id: int,
+    override: FlagEnvironmentOverrideUpdate,
+    db: Session = Depends(get_db),
+):
+    payload = override.model_dump(exclude_unset=True, exclude_none=True)
+    return get_or_create_flag_environment_override(
+        db=db,
+        flag_key=key,
+        environment_id=environment_id,
+        payload=payload,
+    )
 
 
 @router.post(
