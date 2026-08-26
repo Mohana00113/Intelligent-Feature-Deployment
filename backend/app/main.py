@@ -4,10 +4,14 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db, init_db
 from app.cache import evaluation_cache
+from app.analytics import record_evaluation
 from app.engine import evaluate_feature_flag, evaluate_feature_flag_request
 from app.routes.environments import router as environments_router
 from app.routes.flag_environment_overrides import router as flag_environment_overrides_router
 from app.routes.flags import router as flags_router
+from app.routes.audit_logs import router as audit_logs_router
+from app.routes.analytics import router as analytics_router
+from app.routes.cleanup import router as cleanup_router
 from app.schemas import FlagEvaluationRequest, FlagEvaluationResponse, RuntimeFlagEvaluationResponse
 
 app = FastAPI(title="Intelligent Feature Deployment API")
@@ -30,6 +34,9 @@ app.add_middleware(
 app.include_router(flags_router, prefix="/flags", tags=["Feature Flags"])
 app.include_router(environments_router, prefix="/environments", tags=["Environments"])
 app.include_router(flag_environment_overrides_router, prefix="/flag-environment-overrides", tags=["Flag Environment Overrides"])
+app.include_router(audit_logs_router, prefix="/audit-logs", tags=["Audit Logs"])
+app.include_router(analytics_router, prefix="/analytics", tags=["Evaluation Analytics"])
+app.include_router(cleanup_router, prefix="/cleanup", tags=["Cleanup"])
 
 
 @app.on_event("startup")
@@ -95,6 +102,7 @@ def evaluate_runtime_flag(
     try:
         cached_result = evaluation_cache.get(request.flag_key, request.environment, request.user_id, request.group)
         if cached_result is not None:
+            record_evaluation(evaluation_cache.client, request.flag_key, request.environment)
             return {**cached_result, "cached": True}
 
         result = evaluate_feature_flag_request(
@@ -111,6 +119,7 @@ def evaluate_runtime_flag(
             request.group,
             result,
         )
+        record_evaluation(evaluation_cache.client, request.flag_key, request.environment)
         return {**result, "cached": False}
     except KeyError as exc:
         raise HTTPException(

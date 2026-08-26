@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 import FeatureFlagForm from '../components/FeatureFlagForm';
 import { createFlag, deleteFlag, getFlags, updateFlag } from '../services/api';
+import { useEnvironment } from '../context/EnvironmentContext';
 
 const createInitialForm = () => ({
   key: '',
@@ -18,6 +19,7 @@ const createInitialForm = () => ({
 
 function FeatureFlags({ flags: controlledFlags, loading: controlledLoading, error: controlledError, onRefresh }) {
   const navigate = useNavigate();
+  const { environment } = useEnvironment();
   const isControlled = typeof controlledFlags !== 'undefined';
 
   const [internalFlags, setInternalFlags] = useState([]);
@@ -31,7 +33,9 @@ function FeatureFlags({ flags: controlledFlags, loading: controlledLoading, erro
   const [formMode, setFormMode] = useState('create');
   const [editingFlag, setEditingFlag] = useState(null);
 
-  const flags = isControlled ? (Array.isArray(controlledFlags) ? controlledFlags : []) : internalFlags;
+  const environmentId = { development: 1, staging: 2, production: 3 }[environment];
+  const allFlags = isControlled ? (Array.isArray(controlledFlags) ? controlledFlags : []) : internalFlags;
+  const flags = allFlags.filter((flag) => flag.environment_id === environmentId);
   const currentLoading = isControlled ? Boolean(controlledLoading) : loading;
   const currentError = isControlled ? controlledError : error;
 

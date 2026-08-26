@@ -9,6 +9,7 @@ const Navbar = () => {
       <div style={styles.brandWrap}>
         <strong style={styles.brand}>Intelligent Feature Deployment</strong>
         <Link to="/environments" style={styles.environmentsLink}>Environments</Link>
+        <Link to="/audit-logs" style={styles.environmentsLink}>Audit Logs</Link>
       </div>
 
       <div style={styles.environmentWrap}>

@@ -6,9 +6,13 @@ import { EnvironmentProvider } from './context/EnvironmentContext'
 import FeatureFlags from './pages/FeatureFlags'
 import FlagDetail from './pages/FlagDetail'
 import Environments from './pages/Environments'
+import AuditLogs from './pages/AuditLogs'
 import { getFlags } from './services/api'
+import CleanupSuggestions from './components/CleanupSuggestions'
+import { useEnvironment } from './context/EnvironmentContext'
 
 const DashboardPage = () => {
+  const { environment } = useEnvironment()
   const [flags, setFlags] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -18,7 +22,7 @@ const DashboardPage = () => {
       setLoading(true)
       setError('')
       const data = await getFlags()
-      setFlags(Array.isArray(data) ? data : [])
+      setFlags(Array.isArray(data) ? data.filter((flag) => flag.environment_id === ({ development: 1, staging: 2, production: 3 }[environment])) : [])
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load feature flag summary.'
       console.error('Dashboard summary fetch failed:', err)
@@ -27,7 +31,7 @@ const DashboardPage = () => {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [environment])
 
   useEffect(() => {
     let isMounted = true
@@ -82,6 +86,7 @@ const DashboardPage = () => {
         <div style={styles.tableSection}>
           <FeatureFlags flags={flags} loading={loading} error={error} onRefresh={loadFlags} />
         </div>
+        <CleanupSuggestions />
       </div>
     </main>
   )
@@ -96,6 +101,7 @@ const AppContent = () => {
         <Route path="/flags" element={<FeatureFlags />} />
         <Route path="/flags/:key" element={<FlagDetail />} />
         <Route path="/environments" element={<Environments />} />
+        <Route path="/audit-logs" element={<AuditLogs />} />
       </Routes>
     </div>
   )

@@ -312,6 +312,22 @@ class RuntimeFlagEvaluationResponse(BaseModel):
     cached: bool = Field(default=False, description="Whether the result was served from the evaluation cache.")
 
 
+class AuditLogResponse(BaseModel):
+    """Audit event returned by the audit log API."""
+
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+    id: int
+    timestamp: datetime
+    actor: str
+    environment: Optional[str] = None
+    flag_key: str
+    action: str
+    previous_state: Optional[dict[str, Any]] = None
+    new_state: Optional[dict[str, Any]] = None
+    diff: dict[str, Any]
+
+
 class FlagCreate(BaseModel):
     """Schema used to create a new feature flag record.
 

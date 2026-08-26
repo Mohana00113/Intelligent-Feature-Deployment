@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Header, status
 from sqlalchemy.orm import Session
 
 from app.crud import get_flag_environment_overrides, get_or_create_flag_environment_override
@@ -22,9 +22,10 @@ def upsert_flag_override(
     environment_id: int,
     override: FlagEnvironmentOverrideUpdate,
     db: Session = Depends(get_db),
+    x_actor: str | None = Header(default=None),
 ) -> FlagEnvironmentOverride:
     payload = override.model_dump(exclude_unset=True, exclude_none=True)
-    return get_or_create_flag_environment_override(db=db, flag_key=flag_key, environment_id=environment_id, payload=payload)
+    return get_or_create_flag_environment_override(db=db, flag_key=flag_key, environment_id=environment_id, payload=payload, actor=x_actor or "system")
 
 
 @router.post("", response_model=FlagEnvironmentOverrideResponse, status_code=status.HTTP_201_CREATED, summary="Create environment override")
@@ -32,6 +33,7 @@ def create_flag_override(
     flag_key: str,
     override: FlagEnvironmentOverrideCreate,
     db: Session = Depends(get_db),
+    x_actor: str | None = Header(default=None),
 ) -> FlagEnvironmentOverride:
     payload = override.model_dump(exclude_unset=True)
-    return get_or_create_flag_environment_override(db=db, flag_key=flag_key, environment_id=override.environment_id, payload=payload)
+    return get_or_create_flag_environment_override(db=db, flag_key=flag_key, environment_id=override.environment_id, payload=payload, actor=x_actor or "system")

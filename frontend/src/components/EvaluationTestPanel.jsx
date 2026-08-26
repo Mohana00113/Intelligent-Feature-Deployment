@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { evaluateFlag } from '../services/api'
 
 const environments = [
@@ -22,6 +22,11 @@ function EvaluationTestPanel({ flagKey, initialEnvironment = 'development' }) {
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
   const [evaluating, setEvaluating] = useState(false)
+
+  useEffect(() => {
+    const task = window.setTimeout(() => setEnvironment(initialEnvironment), 0)
+    return () => window.clearTimeout(task)
+  }, [initialEnvironment])
 
   const handleEvaluate = async (event) => {
     event.preventDefault()

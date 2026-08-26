@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.crud import (
@@ -43,6 +43,7 @@ def update_feature_flag_environment_override(
     environment_id: int,
     override: FlagEnvironmentOverrideUpdate,
     db: Session = Depends(get_db),
+    x_actor: str | None = Header(default=None),
 ):
     payload = override.model_dump(exclude_unset=True, exclude_none=True)
     return get_or_create_flag_environment_override(
@@ -50,6 +51,7 @@ def update_feature_flag_environment_override(
         flag_key=key,
         environment_id=environment_id,
         payload=payload,
+        actor=x_actor or "system",
     )
 
 
@@ -59,10 +61,10 @@ def update_feature_flag_environment_override(
     status_code=status.HTTP_201_CREATED,
     summary="Create a new feature flag",
 )
-def create_feature_flag(flag: FlagCreate, db: Session = Depends(get_db)) -> FlagResponse:
+def create_feature_flag(flag: FlagCreate, db: Session = Depends(get_db), x_actor: str | None = Header(default=None)) -> FlagResponse:
     """Create a new feature flag and persist it to PostgreSQL."""
 
-    return create_flag(db=db, flag=flag)
+    return create_flag(db=db, flag=flag, actor=x_actor or "system")
 
 
 @router.get(
@@ -92,10 +94,10 @@ def get_feature_flag_by_key(key: str, db: Session = Depends(get_db)) -> FlagResp
     response_model=FlagResponse,
     summary="Update an existing feature flag",
 )
-def update_feature_flag(key: str, flag: FlagUpdate, db: Session = Depends(get_db)) -> FlagResponse:
+def update_feature_flag(key: str, flag: FlagUpdate, db: Session = Depends(get_db), x_actor: str | None = Header(default=None)) -> FlagResponse:
     """Update an existing feature flag record."""
 
-    return update_flag(db=db, key=key, flag=flag)
+    return update_flag(db=db, key=key, flag=flag, actor=x_actor or "system")
 
 
 @router.delete(

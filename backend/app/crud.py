@@ -4,11 +4,12 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.cache import invalidate_all_evaluation_cache, invalidate_flag_evaluation_cache
+from app.audit import create_audit_log, flag_state, override_state, state_diff
 from app.models import Environment, FeatureFlag, FlagEnvironmentOverride
 from app.schemas import EnvironmentCreate, EnvironmentUpdate, FlagCreate, FlagUpdate
 
 
-def create_flag(db: Session, flag: FlagCreate) -> FeatureFlag:
+def create_flag(db: Session, flag: FlagCreate, actor: str = "system") -> FeatureFlag:
     """Create a new feature flag record in the database.
 
     This function validates that the incoming key is unique within the same
@@ -42,6 +43,17 @@ def create_flag(db: Session, flag: FlagCreate) -> FeatureFlag:
     db.add(db_flag)
     db.commit()
     db.refresh(db_flag)
+    environment = db.query(Environment).filter(Environment.id == db_flag.environment_id).first()
+    create_audit_log(
+        db,
+        actor=actor,
+        environment=environment.key if environment else str(db_flag.environment_id),
+        flag_key=db_flag.key,
+        action="CREATE",
+        previous_state=None,
+        new_state=flag_state(db_flag),
+    )
+    db.commit()
     invalidate_flag_evaluation_cache(db_flag.key)
     return db_flag
 
@@ -70,7 +82,7 @@ def get_flag_by_key(db: Session, key: str) -> FeatureFlag:
     return db_flag
 
 
-def update_flag(db: Session, key: str, flag: FlagUpdate) -> FeatureFlag:
+def update_flag(db: Session, key: str, flag: FlagUpdate, actor: str = "system") -> FeatureFlag:
     """Update an existing feature flag record.
 
     The function first loads the record by its unique key. If the update payload
@@ -86,6 +98,7 @@ def update_flag(db: Session, key: str, flag: FlagUpdate) -> FeatureFlag:
         )
 
     previous_key = db_flag.key
+    previous_state = flag_state(db_flag)
     if flag.key and flag.key != db_flag.key:
         target_environment_id = flag.environment_id if flag.environment_id is not None else db_flag.environment_id
         duplicate_check = (
@@ -123,6 +136,25 @@ def update_flag(db: Session, key: str, flag: FlagUpdate) -> FeatureFlag:
     if flag.environment_id is not None:
         db_flag.environment_id = flag.environment_id
 
+    new_state = flag_state(db_flag)
+    environment = db.query(Environment).filter(Environment.id == db_flag.environment_id).first()
+    changed_fields = set(state_diff(previous_state, new_state))
+    targeting_changed = bool(changed_fields.intersection({"target_users", "target_groups"}))
+    if targeting_changed:
+        action = "TARGETING"
+    elif "enabled" in changed_fields:
+        action = "ENABLE" if db_flag.enabled else "DISABLE"
+    else:
+        action = "UPDATE"
+    create_audit_log(
+        db,
+        actor=actor,
+        environment=environment.key if environment else str(db_flag.environment_id),
+        flag_key=db_flag.key,
+        action=action,
+        previous_state=previous_state,
+        new_state=new_state,
+    )
     db.commit()
     invalidate_flag_evaluation_cache(previous_key)
     if db_flag.key != previous_key:
@@ -232,7 +264,13 @@ def get_flag_environment_overrides(db: Session, flag_key: str) -> list[FlagEnvir
     return db.query(FlagEnvironmentOverride).filter(FlagEnvironmentOverride.flag_id == flag.id).all()
 
 
-def get_or_create_flag_environment_override(db: Session, flag_key: str, environment_id: int, payload: dict | None = None):
+def get_or_create_flag_environment_override(
+    db: Session,
+    flag_key: str,
+    environment_id: int,
+    payload: dict | None = None,
+    actor: str = "system",
+):
     """Create or update a flag override for a flag and environment."""
 
     flag = db.query(FeatureFlag).filter(FeatureFlag.key == flag_key).order_by(FeatureFlag.environment_id).first()
@@ -255,6 +293,7 @@ def get_or_create_flag_environment_override(db: Session, flag_key: str, environm
         .first()
     )
 
+    previous_state = override_state(override) if override is not None else None
     if override is None:
         override = FlagEnvironmentOverride(
             flag_id=flag.id,
@@ -282,6 +321,23 @@ def get_or_create_flag_environment_override(db: Session, flag_key: str, environm
         if "description" in payload and payload["description"] is not None:
             override.description = payload["description"]
 
+    new_state = override_state(override)
+    changed_fields = set(state_diff(previous_state, new_state))
+    if changed_fields.intersection({"target_users", "target_groups"}):
+        action = "TARGETING"
+    elif "enabled" in changed_fields:
+        action = "ENABLE" if override.enabled else "DISABLE"
+    else:
+        action = "UPDATE"
+    create_audit_log(
+        db,
+        actor=actor,
+        environment=environment.key,
+        flag_key=flag.key,
+        action=action,
+        previous_state=previous_state,
+        new_state=new_state,
+    )
     db.commit()
     db.refresh(override)
     invalidate_flag_evaluation_cache(flag.key)

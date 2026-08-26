@@ -122,3 +122,46 @@ class UserGroupMembership(Base):
 
     def __repr__(self) -> str:
         return f"UserGroupMembership(user_id={self.user_id!r}, group_name={self.group_name!r})"
+
+
+class AuditLog(Base):
+    """Immutable record of a feature flag configuration change."""
+
+    __tablename__ = "audit_log"
+
+    id = Column(Integer, primary_key=True, index=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    actor = Column(String(100), nullable=False, index=True)
+    environment = Column(String(100), nullable=True, index=True)
+    flag_key = Column(String(100), nullable=False, index=True)
+    action = Column(String(30), nullable=False, index=True)
+    previous_state = Column(JSON, nullable=True)
+    new_state = Column(JSON, nullable=True)
+    diff = Column(JSON, nullable=False, default=dict)
+
+    def __repr__(self) -> str:
+        return f"AuditLog(id={self.id!r}, flag_key={self.flag_key!r}, action={self.action!r})"
+
+
+class EvaluationMetric(Base):
+    """Persisted hourly evaluation counts flushed from Redis."""
+
+    __tablename__ = "evaluation_metrics"
+    __table_args__ = (UniqueConstraint("flag_key", "environment", "hour", name="uq_evaluation_metrics_flag_environment_hour"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    flag_key = Column(String(100), nullable=False, index=True)
+    environment = Column(String(100), nullable=False, index=True, default="development")
+    hour = Column(DateTime, nullable=False, index=True)
+    count = Column(Integer, nullable=False, default=0)
+
+
+class CleanupReview(Base):
+    """Persistent review marker for a cleanup suggestion."""
+
+    __tablename__ = "cleanup_reviews"
+
+    id = Column(Integer, primary_key=True, index=True)
+    flag_key = Column(String(100), nullable=False, unique=True, index=True)
+    reviewed_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    reviewed_by = Column(String(100), nullable=False, default="system")

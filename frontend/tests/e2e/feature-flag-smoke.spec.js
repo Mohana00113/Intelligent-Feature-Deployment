@@ -68,7 +68,7 @@ test.describe('Feature Flag smoke test', () => {
       await expect(await dashboardPage.getCardValue('Disabled Feature Flags')).toContain('0');
 
       await dashboardPage.deleteFlag(FLAG_KEY);
-      await expect(page.getByText(FLAG_KEY)).toHaveCount(0);
+      await expect(await dashboardPage.findFlagRow(FLAG_KEY)).toHaveCount(0);
       await dashboardPage.expectEmptyState();
       await expect(await dashboardPage.getCardValue('Total Feature Flags')).toContain('0');
       await expect(await dashboardPage.getCardValue('Enabled Feature Flags')).toContain('0');

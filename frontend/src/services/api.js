@@ -1,6 +1,9 @@
 const API_BASE_URL = 'http://127.0.0.1:8000';
 
 async function handleResponse(response) {
+  if (response.status === 204) {
+    return null;
+  }
   const contentType = response.headers.get('content-type') || '';
 
   const data = contentType.includes('application/json')
@@ -21,8 +24,9 @@ async function handleResponse(response) {
  * Fetch all feature flags from the backend API.
  * @returns {Promise<Array>} Parsed JSON array of flags.
  */
-export async function getFlags() {
-  const response = await fetch(`${API_BASE_URL}/flags`);
+export async function getFlags(environment) {
+  const query = environment ? `?environment=${encodeURIComponent(environment)}` : '';
+  const response = await fetch(`${API_BASE_URL}/flags${query}`);
   return handleResponse(response);
 }
 
@@ -103,6 +107,33 @@ export async function evaluateFlag(payload) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
+  return handleResponse(response);
+}
+
+export async function getEvaluationMetrics(flagKey, environment = 'development', days = 7) {
+  const response = await fetch(`${API_BASE_URL}/analytics/flags/${encodeURIComponent(flagKey)}/evaluations?environment=${encodeURIComponent(environment)}&days=${days}`);
+  return handleResponse(response);
+}
+
+export async function getAuditLogs(filters = {}) {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value) {
+      params.set(key, value);
+    }
+  });
+  const query = params.toString();
+  const response = await fetch(`${API_BASE_URL}/audit-logs${query ? `?${query}` : ''}`);
+  return handleResponse(response);
+}
+
+export async function getCleanupSuggestions(days = 30) {
+  const response = await fetch(`${API_BASE_URL}/cleanup/suggestions?days=${days}`);
+  return handleResponse(response);
+}
+
+export async function markCleanupReviewed(flagKey) {
+  const response = await fetch(`${API_BASE_URL}/cleanup/suggestions/${encodeURIComponent(flagKey)}/review`, { method: 'POST' });
   return handleResponse(response);
 }
 

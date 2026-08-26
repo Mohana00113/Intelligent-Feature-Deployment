@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { deleteFlag, getFlagByKey, updateFlag } from '../services/api'
+import { useEnvironment } from '../context/EnvironmentContext'
+import { deleteFlag, getEvaluationMetrics, getFlagByKey, updateFlag } from '../services/api'
+import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import EnvironmentOverridePanel from '../components/EnvironmentOverridePanel'
 import EvaluationTestPanel from '../components/EvaluationTestPanel'
 import TargetingRulePanel from '../components/TargetingRulePanel'
@@ -14,6 +16,7 @@ const environmentLabels = {
 function FlagDetail() {
   const { key } = useParams()
   const navigate = useNavigate()
+  const { environment } = useEnvironment()
   const [flag, setFlag] = useState(null)
   const [, setTargetUsers] = useState([])
   const [, setTargetGroups] = useState([])
@@ -22,6 +25,10 @@ function FlagDetail() {
   const [savingTargeting, setSavingTargeting] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [metricDays, setMetricDays] = useState(7)
+  const [metrics, setMetrics] = useState([])
+  const [metricsLoading, setMetricsLoading] = useState(true)
+  const [metricsError, setMetricsError] = useState('')
 
   const handleDelete = async () => {
     if (!flag || !key) {
@@ -58,6 +65,26 @@ function FlagDetail() {
 
     loadFlag()
   }, [key])
+
+  useEffect(() => {
+    async function loadMetrics() {
+      try {
+        setMetricsLoading(true)
+        setMetricsError('')
+        const data = await getEvaluationMetrics(key, environment, metricDays)
+        setMetrics(Array.isArray(data?.points) ? data.points : [])
+      } catch (err) {
+        setMetricsError(err.message || 'Unable to load evaluation metrics.')
+        setMetrics([])
+      } finally {
+        setMetricsLoading(false)
+      }
+    }
+
+    if (key) {
+      void loadMetrics()
+    }
+  }, [key, environment, metricDays])
 
   const handleRolloutSave = async (nextPercentage) => {
     if (!flag || !key) {
@@ -164,9 +191,17 @@ function FlagDetail() {
 
             <EnvironmentOverridePanel flag={flag} />
 
+            <EvaluationMetricsPanel
+              days={metricDays}
+              metrics={metrics}
+              loading={metricsLoading}
+              error={metricsError}
+              onDaysChange={setMetricDays}
+            />
+
             <EvaluationTestPanel
               flagKey={flag.key}
-              initialEnvironment={environmentLabels[flag.environment_id]?.toLowerCase() || 'development'}
+              initialEnvironment={environment}
             />
           </>
         ) : (
@@ -174,6 +209,46 @@ function FlagDetail() {
         )}
       </div>
     </div>
+  )
+}
+
+function EvaluationMetricsPanel({ days, metrics, loading, error, onDaysChange }) {
+  const chartData = metrics.map((point) => ({
+    ...point,
+    label: new Date(point.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' }),
+  }))
+
+  return (
+    <section style={styles.metricsSection} aria-labelledby="evaluation-metrics-title">
+      <div style={styles.metricsHeader}>
+        <div>
+          <h3 id="evaluation-metrics-title" style={styles.targetingRulesTitle}>Evaluation Count</h3>
+          <p style={styles.metricsHint}>Hourly evaluations recorded after the daily metrics flush.</p>
+        </div>
+        <label style={styles.metricsSelectLabel}>
+          Range
+          <select value={days} onChange={(event) => onDaysChange(Number(event.target.value))} style={styles.metricsSelect}>
+            <option value="7">Last 7 days</option>
+            <option value="30">Last 30 days</option>
+          </select>
+        </label>
+      </div>
+      {loading ? <p style={styles.metricsStatus}>Loading evaluation metrics...</p> : null}
+      {error ? <p style={styles.error}>{error}</p> : null}
+      {!loading && !error && chartData.length === 0 ? <p style={styles.metricsStatus}>No evaluation metrics available yet.</p> : null}
+      {!loading && !error && chartData.length > 0 ? (
+        <div style={styles.chart}>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData} margin={{ top: 12, right: 18, left: 0, bottom: 4 }}>
+              <XAxis dataKey="label" minTickGap={28} tick={{ fontSize: 11 }} />
+              <YAxis allowDecimals={false} width={36} tick={{ fontSize: 11 }} />
+              <Tooltip formatter={(value) => [value, 'Evaluations']} />
+              <Line type="monotone" dataKey="count" stroke="#2563eb" strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      ) : null}
+    </section>
   )
 }
 
@@ -324,6 +399,13 @@ const styles = {
     borderRadius: '12px',
     padding: '20px',
   },
+  metricsSection: { marginTop: '24px', padding: '20px', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#ffffff' },
+  metricsHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '16px', flexWrap: 'wrap' },
+  metricsHint: { margin: '6px 0 0', color: '#64748b', fontSize: '13px' },
+  metricsSelectLabel: { display: 'grid', gap: '6px', color: '#64748b', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase' },
+  metricsSelect: { border: '1px solid #cbd5e1', borderRadius: '8px', padding: '9px 10px', color: '#0f172a', background: '#fff', fontSize: '14px' },
+  metricsStatus: { color: '#64748b', fontSize: '14px', padding: '20px 0', margin: 0 },
+  chart: { width: '100%', height: '260px', marginTop: '14px' },
   targetingRulesTitle: {
     margin: '0 0 8px',
     color: '#111827',
